@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Web CPU</title>
+    <style>
+      #terminal {
+        resize : none;
+        
+        background : #000;
+        color      : #FFF;
+        
+        font-family : monospace;
+      }
+    </style>
+  </head>
+  <body>
+    <textarea id="terminal" cols="120" rows="30">
+      
+    </textarea>
+    
+    <script>
+      let gchar = function(c) { return c.charCodeAt(0); }
+    
+      let test_prog_data = [
+        0x01, gchar("F"), 0xFF, 0x01
+      ];
+      
+      let test_prog = new Array(0x1FF);
+      for(let i of test_prog_data) {
+        test_prog.push(i);
+      }
+    
+      let cpu = {
+        registers : {
+          F  : 0,
+
+          X  : 0,
+          Y  : 0,
+          AX : 0,
+          AY : 0,
+          
+          PC : 0,
+          SP : 0,
+        },
+        
+        set_flag : null,
+        get_flag : null,
+        
+        memory  : new Array(65536).fill(0),
+        
+        opcodes : new Array(256),
+
+        step    : null,
+        stop    : null,
+        run     : null,
+        
+        break   : false
+      };
+      
+      for(let i = 0; i < test_prog.length; ++i) {
+        cpu.memory[i] = test_prog[i];
+      }
+      
+      cpu.set_flag = function(flag, value) {
+        cpu.registers.F = value ? cpu.registers.F |= flag : cpu.registers.F &= ~flag;
+      }
+      
+      cpu.get_flag = function(flag) {
+        return (cpu.registers.F & flag) > 0;
+      }
+      
+      cpu.step = function() {
+        let op    = cpu.memory[cpu.registers.PC];
+        let arga  = cpu.memory[cpu.registers.PC + 1];
+        let argb  = cpu.memory[cpu.registers.PC + 2];
+        let argc  = cpu.memory[cpu.registers.PC + 3];
+        let argab = arga | (argb >> 8);
+        let argbc = argb | (argc >> 8);
+        
+        cpu.opcodes[op].func(op, arga, argb, argab, argbc);
+        
+        cpu.registers.PC += cpu.opcodes[op].step;
+      }
+      
+      cpu.stop = function() {
+        cpu.break = true;
+      }
+      
+      cpu.run = function() {
+        cpu.registers.PC = 0x200;
+        
+        while(!cpu.break) {
+          cpu.step();
+        }
+      }
+      
+      cpu.opcodes[0] = {
+        step : 1,
+        func : function() {
+          cpu.stop();
+        }
+      };
+      
+      let term = document.getElementById("terminal");
+      
+      cpu.opcodes[1] = {
+        step : 4,
+        func : function(op, a, b, c, ab, bc) {
+          if(bc == 0xFF01) {
+            term.value += String.fromCharCode(a);
+          }
+          
+          cpu.memory[bc] = a;
+        }
+      };
+      
+      
+      
+      cpu.run();
+    </script>
+  </body>
+</html>
